@@ -105,7 +105,7 @@ function renderHeroFromContent(pageSections) {
 
 function renderSection(section, sectionIndex) {
   const wrapper = document.createElement("section");
-  wrapper.id = section.sectionKey || section.id;
+  wrapper.id = section.anchorId || section.sectionKey || section.id;
   wrapper.className = sectionIndex % 2 === 1 ? "section section-alt" : "section container";
 
   const sectionBody = sectionIndex % 2 === 1 ? document.createElement("div") : wrapper;
@@ -116,13 +116,21 @@ function renderSection(section, sectionIndex) {
 
   const head = document.createElement("div");
   head.className = "section-head";
+  const subtitleHtml = section.subtitle ? `<p class="lead">${section.subtitle}</p>` : "";
+  const bodyHtml = section.body
+    ? `<p>${String(section.body).replace(/\n/g, "<br />")}</p>`
+    : "";
   head.innerHTML = `
     <p class="eyebrow">${toTitleCase(section.sectionKey || "Section")}</p>
     <h2>${section.title || section.name || "Section"}</h2>
+    ${subtitleHtml}
+    ${bodyHtml}
   `;
   sectionBody.appendChild(head);
 
-  const items = Array.isArray(section.items) ? section.items : [];
+  const items = Array.isArray(section.items)
+    ? section.items.filter((item) => item.visible !== false)
+    : [];
 
   if (items.length === 0) {
     const empty = document.createElement("p");
@@ -174,7 +182,9 @@ function renderPageContent(page) {
     return;
   }
 
-  const sections = Array.isArray(page.sections) ? page.sections : [];
+  const sections = Array.isArray(page.sections)
+    ? page.sections.filter((section) => section.visible !== false)
+    : [];
   dynamicPageContent.innerHTML = "";
   sections.forEach((section, index) => {
     dynamicPageContent.appendChild(renderSection(section, index));
