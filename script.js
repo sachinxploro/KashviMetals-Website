@@ -82,10 +82,10 @@ function renderHeroFromContent(pageSections) {
   const firstSection = pageSections[0];
   const items = Array.isArray(firstSection.items) ? firstSection.items : [];
 
-  heroEyebrow.textContent = toTitleCase(firstSection.sectionKey || "Highlights");
+  heroEyebrow.textContent = "";
+  heroEyebrow.style.display = "none";
   heroTitle.textContent = firstSection.title || firstSection.name || "Website Content";
-  heroLead.textContent =
-    firstSection.jsonConfig || "Data-driven content loaded from content.json.";
+  heroLead.textContent = firstSection.subtitle || "";
 
   if (heroCtaPrimary) {
     heroCtaPrimary.href = `#${firstSection.sectionKey || firstSection.id}`;
