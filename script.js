@@ -60,14 +60,46 @@ function getCurrentSlug() {
   return slug || "index";
 }
 
-function renderDynamicMenu(pageSections) {
+function resolveNavHref(navItem, pageSections) {
+  if (navItem.url) {
+    return navItem.url;
+  }
+  if (navItem.anchorId) {
+    return `#${navItem.anchorId}`;
+  }
+  if (navItem.sectionKey) {
+    const matchedSection = (pageSections || []).find(
+      (section) => section.sectionKey === navItem.sectionKey
+    );
+    if (matchedSection) {
+      return `#${matchedSection.anchorId || matchedSection.sectionKey || matchedSection.id}`;
+    }
+    return `#${navItem.sectionKey}`;
+  }
+  if (typeof navItem.target === "string" && navItem.target.trim()) {
+    return navItem.target.startsWith("#") ? navItem.target : `#${navItem.target}`;
+  }
+  return "#";
+}
+
+function renderDynamicMenu(navItems, pageSections) {
   if (!primaryMenu) {
     return;
   }
 
-  const links = pageSections.map((section) => {
-    const id = section.sectionKey || section.id;
-    return `<li><a href="#${id}">${toTitleCase(section.name || section.sectionKey || "Section")}</a></li>`;
+  const resolvedNavItems = Array.isArray(navItems)
+    ? navItems
+        .filter((item) => item && item.visible !== false)
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+    : [];
+
+  const links = (resolvedNavItems.length > 0 ? resolvedNavItems : pageSections).map((entry) => {
+    if (resolvedNavItems.length > 0) {
+      const label = entry.label || entry.title || entry.name || "Menu";
+      return `<li><a href="${resolveNavHref(entry, pageSections)}">${label}</a></li>`;
+    }
+    const id = entry.anchorId || entry.sectionKey || entry.id;
+    return `<li><a href="#${id}">${toTitleCase(entry.name || entry.sectionKey || "Section")}</a></li>`;
   });
 
   links.push('<li><a href="#contact" class="btn btn-nav">Contact</a></li>');
@@ -177,7 +209,7 @@ function renderSection(section, sectionIndex) {
   return wrapper;
 }
 
-function renderPageContent(page) {
+function renderPageContent(page, navItems) {
   if (!dynamicPageContent) {
     return;
   }
@@ -190,7 +222,7 @@ function renderPageContent(page) {
     dynamicPageContent.appendChild(renderSection(section, index));
   });
 
-  renderDynamicMenu(sections);
+  renderDynamicMenu(navItems, sections);
   renderHeroFromContent(sections);
 }
 
@@ -223,10 +255,11 @@ async function loadContent() {
     const currentSlug = getCurrentSlug();
     const pages = Array.isArray(contentData?.pages) ? contentData.pages : [];
     const page = pages.find((p) => p.slug === currentSlug) || pages[0];
+    const navItems = Array.isArray(contentData?.navItems) ? contentData.navItems : [];
 
     applySiteBranding(contentData);
     if (page) {
-      renderPageContent(page);
+      renderPageContent(page, navItems);
     }
   } catch (error) {
     console.error("Content load error:", error);
