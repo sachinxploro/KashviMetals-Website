@@ -130,40 +130,55 @@ function renderDynamicMenu(navItems, pageSections) {
         .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
     : [];
 
-  const flattenWithParentOrder = (items) => {
-    const parentMap = new Map();
-    const roots = [];
-    items.forEach((item) => {
+  if (resolvedNavItems.length > 0) {
+    const byParent = new Map();
+    resolvedNavItems.forEach((item) => {
       const parentId = item.parentId || "";
-      if (!parentMap.has(parentId)) {
-        parentMap.set(parentId, []);
+      if (!byParent.has(parentId)) {
+        byParent.set(parentId, []);
       }
-      parentMap.get(parentId).push(item);
+      byParent.get(parentId).push(item);
     });
-    (parentMap.get("") || []).forEach((root) => {
-      roots.push({ ...root, depth: 0 });
-      const children = (parentMap.get(root.id) || []).sort(
+
+    const roots = byParent.get("") || [];
+    const links = roots.map((root) => {
+      const rootLabel = root.label || root.title || root.name || "Menu";
+      const rootHref = resolveNavHref(root, pageSections);
+      const children = (byParent.get(root.id) || []).sort(
         (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
       );
-      children.forEach((child) => roots.push({ ...child, depth: 1 }));
+
+      if (children.length === 0) {
+        return `<li><a href="${rootHref}">${rootLabel}</a></li>`;
+      }
+
+      const childLinks = children
+        .map((child) => {
+          const childLabel = child.label || child.title || child.name || "Menu";
+          const childHref = resolveNavHref(child, pageSections);
+          return `<li><a href="${childHref}">${childLabel}</a></li>`;
+        })
+        .join("");
+
+      return `
+        <li class="has-children">
+          <a href="${rootHref}">${rootLabel}</a>
+          <ul class="submenu">${childLinks}</ul>
+        </li>
+      `;
     });
-    return roots.length > 0 ? roots : items.map((item) => ({ ...item, depth: 0 }));
-  };
 
-  const navList =
-    resolvedNavItems.length > 0 ? flattenWithParentOrder(resolvedNavItems) : pageSections;
+    links.push('<li><a href="#contact" class="btn btn-nav">Contact</a></li>');
+    primaryMenu.innerHTML = links.join("");
+    return;
+  }
 
-  const links = navList.map((entry) => {
-    if (resolvedNavItems.length > 0) {
-      const label = entry.label || entry.title || entry.name || "Menu";
-      return `<li><a href="${resolveNavHref(entry, pageSections)}">${label}</a></li>`;
-    }
+  const sectionLinks = pageSections.map((entry) => {
     const id = entry.anchorId || entry.sectionKey || entry.id;
     return `<li><a href="#${id}">${toTitleCase(entry.name || entry.sectionKey || "Section")}</a></li>`;
   });
-
-  links.push('<li><a href="#contact" class="btn btn-nav">Contact</a></li>');
-  primaryMenu.innerHTML = links.join("");
+  sectionLinks.push('<li><a href="#contact" class="btn btn-nav">Contact</a></li>');
+  primaryMenu.innerHTML = sectionLinks.join("");
 }
 
 function renderHeroFromContent(pageSections) {
