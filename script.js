@@ -156,8 +156,7 @@ function renderDynamicMenu(navItems, pageSections) {
   const links = navList.map((entry) => {
     if (resolvedNavItems.length > 0) {
       const label = entry.label || entry.title || entry.name || "Menu";
-      const prefixedLabel = entry.depth === 1 ? `- ${label}` : label;
-      return `<li><a href="${resolveNavHref(entry, pageSections)}">${prefixedLabel}</a></li>`;
+      return `<li><a href="${resolveNavHref(entry, pageSections)}">${label}</a></li>`;
     }
     const id = entry.anchorId || entry.sectionKey || entry.id;
     return `<li><a href="#${id}">${toTitleCase(entry.name || entry.sectionKey || "Section")}</a></li>`;
