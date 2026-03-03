@@ -53,6 +53,25 @@ function toTitleCase(value) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function normalizeText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+function parseSectionConfig(rawConfig) {
+  if (!rawConfig || typeof rawConfig !== "string") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(rawConfig);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function getCurrentSlug() {
   const path = window.location.pathname.split("/").filter(Boolean);
   const fileName = path[path.length - 1] || "index.html";
@@ -61,6 +80,8 @@ function getCurrentSlug() {
 }
 
 function resolveNavHref(navItem, pageSections) {
+  const sections = Array.isArray(pageSections) ? pageSections : [];
+
   if (navItem.url) {
     return navItem.url;
   }
@@ -68,7 +89,7 @@ function resolveNavHref(navItem, pageSections) {
     return `#${navItem.anchorId}`;
   }
   if (navItem.sectionKey) {
-    const matchedSection = (pageSections || []).find(
+    const matchedSection = sections.find(
       (section) => section.sectionKey === navItem.sectionKey
     );
     if (matchedSection) {
@@ -79,6 +100,22 @@ function resolveNavHref(navItem, pageSections) {
   if (typeof navItem.target === "string" && navItem.target.trim()) {
     return navItem.target.startsWith("#") ? navItem.target : `#${navItem.target}`;
   }
+
+  if (navItem.label) {
+    const normalizedLabel = normalizeText(navItem.label);
+    const matchedSection = sections.find((section) => {
+      return (
+        normalizeText(section.title) === normalizedLabel ||
+        normalizeText(section.name) === normalizedLabel ||
+        normalizeText(section.sectionKey) === normalizedLabel ||
+        normalizeText(section.anchorId) === normalizedLabel
+      );
+    });
+    if (matchedSection) {
+      return `#${matchedSection.anchorId || matchedSection.sectionKey || matchedSection.id}`;
+    }
+  }
+
   return "#";
 }
 
@@ -93,10 +130,34 @@ function renderDynamicMenu(navItems, pageSections) {
         .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
     : [];
 
-  const links = (resolvedNavItems.length > 0 ? resolvedNavItems : pageSections).map((entry) => {
+  const flattenWithParentOrder = (items) => {
+    const parentMap = new Map();
+    const roots = [];
+    items.forEach((item) => {
+      const parentId = item.parentId || "";
+      if (!parentMap.has(parentId)) {
+        parentMap.set(parentId, []);
+      }
+      parentMap.get(parentId).push(item);
+    });
+    (parentMap.get("") || []).forEach((root) => {
+      roots.push({ ...root, depth: 0 });
+      const children = (parentMap.get(root.id) || []).sort(
+        (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+      );
+      children.forEach((child) => roots.push({ ...child, depth: 1 }));
+    });
+    return roots.length > 0 ? roots : items.map((item) => ({ ...item, depth: 0 }));
+  };
+
+  const navList =
+    resolvedNavItems.length > 0 ? flattenWithParentOrder(resolvedNavItems) : pageSections;
+
+  const links = navList.map((entry) => {
     if (resolvedNavItems.length > 0) {
       const label = entry.label || entry.title || entry.name || "Menu";
-      return `<li><a href="${resolveNavHref(entry, pageSections)}">${label}</a></li>`;
+      const prefixedLabel = entry.depth === 1 ? `- ${label}` : label;
+      return `<li><a href="${resolveNavHref(entry, pageSections)}">${prefixedLabel}</a></li>`;
     }
     const id = entry.anchorId || entry.sectionKey || entry.id;
     return `<li><a href="#${id}">${toTitleCase(entry.name || entry.sectionKey || "Section")}</a></li>`;
@@ -146,19 +207,57 @@ function renderSection(section, sectionIndex) {
     wrapper.appendChild(sectionBody);
   }
 
+  const sectionConfig = parseSectionConfig(section.jsonConfig);
+
   const head = document.createElement("div");
   head.className = "section-head";
-  const subtitleHtml = section.subtitle ? `<p class="lead">${section.subtitle}</p>` : "";
+  const showEyebrow = sectionConfig.showEyebrow !== false;
+  const showTitle = sectionConfig.showTitle !== false;
+  const showSubtitle = sectionConfig.showSubtitle !== false;
+  const subtitleHtml = showSubtitle && section.subtitle ? `<p class="lead">${section.subtitle}</p>` : "";
   const bodyHtml = section.body
     ? `<p>${String(section.body).replace(/\n/g, "<br />")}</p>`
     : "";
+  const titleAlign = sectionConfig.titleAlign || "left";
+  const eyebrowHtml = showEyebrow
+    ? `<p class="eyebrow">${toTitleCase(section.sectionKey || "Section")}</p>`
+    : "";
+  const titleHtml = showTitle ? `<h2>${section.title || section.name || "Section"}</h2>` : "";
+  const highlightHtml =
+    sectionConfig.highlight && sectionConfig.highlight.enabled && sectionConfig.highlight.text
+      ? `<p class="lead"><strong>${sectionConfig.highlight.text}</strong></p>`
+      : "";
   head.innerHTML = `
-    <p class="eyebrow">${toTitleCase(section.sectionKey || "Section")}</p>
-    <h2>${section.title || section.name || "Section"}</h2>
+    ${eyebrowHtml}
+    ${titleHtml}
     ${subtitleHtml}
+    ${highlightHtml}
     ${bodyHtml}
   `;
+  head.style.textAlign = titleAlign;
+  if (sectionConfig.maxBodyWidth) {
+    head.style.maxWidth = sectionConfig.maxBodyWidth;
+  }
   sectionBody.appendChild(head);
+
+  if (sectionConfig.media && sectionConfig.media.enabled && sectionConfig.media.src) {
+    const mediaFigure = document.createElement("figure");
+    mediaFigure.className = "gallery-item";
+    mediaFigure.style.maxWidth = "420px";
+    mediaFigure.style.margin = "0 0 1rem";
+    mediaFigure.innerHTML = `<img src="${sectionConfig.media.src}" alt="${
+      sectionConfig.media.alt || section.title || section.name || "Section image"
+    }" loading="lazy" />`;
+    sectionBody.appendChild(mediaFigure);
+  }
+
+  if (sectionConfig.cta && sectionConfig.cta.enabled && sectionConfig.cta.label) {
+    const cta = document.createElement("a");
+    cta.className = sectionConfig.cta.style === "ghost" ? "btn btn-ghost" : "btn";
+    cta.href = sectionConfig.cta.href || "#contact";
+    cta.textContent = sectionConfig.cta.label;
+    sectionBody.appendChild(cta);
+  }
 
   const items = Array.isArray(section.items)
     ? section.items.filter((item) => item.visible !== false)
