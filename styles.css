@@ -110,9 +110,47 @@ a {
   padding: 0;
 }
 
+.menu > li {
+  position: relative;
+}
+
 .menu a {
   font-weight: 600;
   color: var(--brand-strong);
+}
+
+.submenu {
+  list-style: none;
+  margin: 0;
+  padding: 0.45rem 0;
+  min-width: 190px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  display: none;
+  z-index: 60;
+}
+
+.submenu li {
+  width: 100%;
+}
+
+.submenu a {
+  display: block;
+  padding: 0.45rem 0.75rem;
+}
+
+.submenu a:hover {
+  background: #eef4f8;
+}
+
+.has-children:hover .submenu,
+.has-children:focus-within .submenu {
+  display: block;
 }
 
 .menu-toggle {
@@ -404,6 +442,18 @@ h2 {
 
   .menu.open {
     display: flex;
+  }
+
+  .submenu {
+    position: static;
+    display: block;
+    border: 0;
+    border-left: 2px solid var(--line);
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    min-width: 0;
+    padding: 0.25rem 0 0.25rem 0.75rem;
   }
 
   .btn-nav {
